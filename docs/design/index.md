@@ -4,4 +4,5 @@ This will be filled in over time, as we figure out more about the logic behind t
 
 ## Topics
 
+- [Architecture](architecture.md)
 * [Security and Authentication](security.md)
