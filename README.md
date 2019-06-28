@@ -1,2 +1,6 @@
 # minibot
-An implementation of a simple client
+A open source Twitch bot, improving on flexibility from other bots.
+
+## Design
+
+See [the design docs](docs/design/).
