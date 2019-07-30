@@ -1,6 +1,6 @@
 from .oauth import (AccountCreationManager, OAuthCallbackManager, OAuthClientInfo, TWITCH_PROVIDER, OAuthProvider)
 
-from tornado import web, ioloop
+from tornado import web, ioloop, httpclient, escape
 import asyncio
 import secrets
 import yaml
@@ -42,7 +42,7 @@ class CompleteAccountCreateHandler(web.RequestHandler):
 
     async def post(self) -> None:
         token = self.get_argument('state_token')
-        result = self._creation_manager.wait_result(token)
+        result = await self._creation_manager.wait_result(token)
         self.write(result)
 
 class HelloWorldHandler(web.RequestHandler):
@@ -66,18 +66,40 @@ def ReadConfig():
         config_data['client_secret'],
         config_data['redirect_url'])
 
-
-def main():
-    print('Starting app at 8080')
+def MakeServer():
     client_info = ReadConfig()
     provider = OAuthProvider(client_info, TWITCH_PROVIDER)
     callbacks = OAuthCallbackManager(provider)
     creations = AccountCreationManager()
-    app = web.Application([
+    return web.Application([
         (r'/callback', OAuthRedirectHandler, dict(callback_manager=callbacks)),
         (r'/account/create', StartAccountCreateHandler, dict(callback_manager=callbacks, creation_manager=creations)),
         (r'/account/complete', CompleteAccountCreateHandler, dict(creation_manager=creations)),
     ])
-    app.listen(8080)
 
-    ioloop.IOLoop.current().start()
+def TestAccountCreateExchange():
+    app = MakeServer()
+    app.listen(8080)
+    client = httpclient.AsyncHTTPClient()
+    loop = ioloop.IOLoop.current()
+    async def inner():
+        first_response = await client.fetch("http://localhost:8080/account/create", method = "POST", body = "")
+        response_body = escape.json_decode(first_response.body)
+        state_token = response_body['state_token']
+        url = response_body['auth_url']
+        print("Go to Authorization URL: {}".format(url))
+        second_response = await client.fetch("http://localhost:8080/account/complete?state_token={}".format(state_token), method = "POST", body = "")
+        response_body = escape.json_decode(second_response.body)
+        print("Response body: {}".format(response_body))
+        loop.stop()
+
+    def run_client():
+        asyncio.create_task(inner())
+
+    loop.add_callback(run_client)
+    loop.start()
+
+
+
+def main():
+    TestAccountCreateExchange()

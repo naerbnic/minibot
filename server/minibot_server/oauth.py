@@ -12,7 +12,7 @@ class Error(BaseException):
 class OAuthClientInfo:
     client_id: str
     client_secret: str
-    redirect_uri: str
+    redirect_url: str
 
     def __init__(self, client_id: str, client_secret: str, redirect_url: str):
         self.client_id = client_id
@@ -59,13 +59,14 @@ class OAuthProvider:
             'client_secret': self.client.client_secret,
             'code': code,
             'grant_type': 'authorization_code',
-            'redirect_url': self.client.redirect_uri,
+            'redirect_uri': self.client.redirect_url,
         })
 
         exchange_url = "%s?%s" %(self.provider.token_endpoint, params)
-        request = httpclient.HTTPRequest(url = exchange_url, method = 'POST')
+        request = httpclient.HTTPRequest(url = exchange_url, method = 'POST', body = "")
         response = await client.fetch(request)
-        if response.headers['Content-Type'] != 'application/json; charset=utf8':
+        if response.headers['Content-Type'] != 'application/json':
+            print(response.headers['Content-Type'])
             raise Error()
 
         return json.loads(response.body.decode('utf-8'))
@@ -94,7 +95,7 @@ class OAuthCallbackManager:
         token = secrets.token_urlsafe(30)
         auth_url = self._provider.auth_url(
             state_token = token,
-            scopes = ['oidc'])
+            scopes = ['openid', 'user:edit'])
 
         event = asyncio.Event()
 
