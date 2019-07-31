@@ -28,6 +28,7 @@ Operations are generally split into events and commands. Events are things that 
 
 - Get all users in chat
 - Get all subscribers to channel
+- Get all followers for channel
 - Have ChatBot send a message in chat
 - Have ChatBot send a message to a user via whisper
 - Have ChatBot clear chat

@@ -5,4 +5,6 @@ This will be filled in over time, as we figure out more about the logic behind t
 ## Topics
 
 - [Architecture](architecture.md)
-* [Security and Authentication](security.md)
+- [Minibot API](minibot_api.md)
+- [Twitch API Usage](twitch_api_usage.md)
+- [Security and Authentication](security.md)
