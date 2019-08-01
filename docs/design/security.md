@@ -82,13 +82,11 @@ Suggest the following protocol:
 
    The order here is important. By setting up the web address first, we can be sure that no other process binds a socket to the port we report to the server.
 
-2. Client `POST`s to a server endpoint with the IP address and port selected for the server.
-
-   We may want to allow the user to provide their own nonce, so they can verify the data returned from the server through the local HTTP server.
+2. Client `POST`s to a server endpoint with the IP address and port selected for the server. They also send a code challenge which is a hash of some data the client only knows.
 
 3. Server verifies that the IP address is a valid loopback address (for either IPv4 or IPv6).
 
-4. Server registers the IP/port combination to a secure random token.
+4. Server registers the IP/port/challenge combination to a secure random token.
 
 5. Server replies to the client's `POST` with a authorization URL including the random token as the state field.
 
@@ -96,19 +94,24 @@ Suggest the following protocol:
 
 7. User proceeds through the OAuth process. On success, the user agent redirects to the server's OAuth callback address.
 
-8. The server recieves the code via the callback address, exchanges it for OAuth refresh and auth tokens, creates an account, and creates a Minibot auth token.
+8. The server recieves the code via the callback address, finds the IP/port/challenge combo. It registers the code challenge and oauth code to a new secure random token.
 
-9. Server redirects the user agent to a static page with the registered ip address, port, and Minibot auth token in the URL fragment.
+9. Server redirects the user agent to the IP/port, along with the new token.
 
-10. Static page in user agent starts AJAX call to Client webserver using the given host, port, and providing the Minibot auth token as part of the post.
+   We assume this token may be intercepted, as it's transferred in plaintext, even if it's on the same machine.
 
-11. Client recieves the HTTP request and records the Minibot auth token.
+10. Client recieves the HTTP request with the token.
+
+11. Client `POST`s the token and the challenge verifier (the unhashed data) via HTTPS to the server.
+
+12. The server verifies that the hash of the verifier matches the challenge stored for the token.
+
+13. The server performs the OAuth code exchange, and creates the user's account. It returns a login auth token to the client.
 
 This process is more complex than that of the basic POST authorization. It is intended to prevent an attacker from being able to create an account without any kind of local control over the user's machine. This protocol requires that an attacker open up a webserver locally on the client's machine and convince that same user to through the OAuth authentication process on that machine. This can only realistically happen if the user runs a malicious binary on their computer, which is a level of compromised that we can't have much control over.
 
 This approach is a variant on the recommendations for [OAuth 2.0 for Native Apps](https://tools.ietf.org/html/rfc8252). Some specific observations:
 
-- This protocol assumes that a connection to a localhost server is secure. If there is any risk of a local eavesdropper as a valid attack, we can follow through with their recommendation to use a secure-hash-based token acquire from the server over HTTPS ([PKCE](https://tools.ietf.org/html/rfc7636)).
 - The user must provide an IP address, not the literal domain `localhost` as that can potentially be rebound by malicious code. This doesn't prevent attacks entirely, but reduces the attack surface.
 
 ## Twitch Account Authorization
