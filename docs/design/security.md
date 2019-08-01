@@ -42,7 +42,9 @@ The steps in the account creation flow from the native client:
 
 ### Alternatives
 
-1. Have the user obtain their own OID token through a native-app conforming provider and use that key to proceed through the account creation flow.
+#### Client OID Token
+
+Have the user obtain their own OID token through a native-app conforming provider and use that key to proceed through the account creation flow.
 
 This may seem to be more secure at first, but is in fact no more so than this version of the flow. The user would still obtain their OID token as part of the process, which can be spoofed as easily by a third party as this process. The disadvantages is that we must keep track of a small amount of state (the state key and login state) on our server, vs. using a the authentication provider's server. As this is primarily used for login events only, and can have a short term expiry, this shouldn't be a bit problem.
 
@@ -70,7 +72,44 @@ Attacker approach in this alternative flow:
 
 The only advantage is in doing it in two phases (also doable with current Twitch OpenID) there are multiple chances for the service to be caught. These approches are equivalent, just that this alternative makes the security more complex.
 
-As mentioned, we can likely encode the state information into the oauth2 state key itself (encrypted symmetrically) so that we don't have to save any state at all. This
+As mentioned, we can likely encode the state information into the oauth2 state key itself (encrypted symmetrically) so that we don't have to save any state at all.
+
+#### Redirect to local HTTP Server
+
+Suggest the following protocol:
+
+1. Client opens a local HTTP Server on a loopback device (either `127.0.0.1` for IPv4, or `[::1]` for IPv6). These may bind to an arbitrary port. Note that this _does not_ use HTTPS.
+
+   The order here is important. By setting up the web address first, we can be sure that no other process binds a socket to the port we report to the server.
+
+2. Client `POST`s to a server endpoint with the IP address and port selected for the server.
+
+   We may want to allow the user to provide their own nonce, so they can verify the data returned from the server through the local HTTP server.
+
+3. Server verifies that the IP address is a valid loopback address (for either IPv4 or IPv6).
+
+4. Server registers the IP/port combination to a secure random token.
+
+5. Server replies to the client's `POST` with a authorization URL including the random token as the state field.
+
+6. Client directs the user to the authorization URL via a local user agent (e.g. web browser).
+
+7. User proceeds through the OAuth process. On success, the user agent redirects to the server's OAuth callback address.
+
+8. The server recieves the code via the callback address, exchanges it for OAuth refresh and auth tokens, creates an account, and creates a Minibot auth token.
+
+9. Server redirects the user agent to a static page with the registered ip address, port, and Minibot auth token in the URL fragment.
+
+10. Static page in user agent starts AJAX call to Client webserver using the given host, port, and providing the Minibot auth token as part of the post.
+
+11. Client recieves the HTTP request and records the Minibot auth token.
+
+This process is more complex than that of the basic POST authorization. It is intended to prevent an attacker from being able to create an account without any kind of local control over the user's machine. This protocol requires that an attacker open up a webserver locally on the client's machine and convince that same user to through the OAuth authentication process on that machine. This can only realistically happen if the user runs a malicious binary on their computer, which is a level of compromised that we can't have much control over.
+
+This approach is a variant on the recommendations for [OAuth 2.0 for Native Apps](https://tools.ietf.org/html/rfc8252). Some specific observations:
+
+- This protocol assumes that a connection to a localhost server is secure. If there is any risk of a local eavesdropper as a valid attack, we can follow through with their recommendation to use a secure-hash-based token acquire from the server over HTTPS ([PKCE](https://tools.ietf.org/html/rfc7636)).
+- The user must provide an IP address, not the literal domain `localhost` as that can potentially be rebound by malicious code. This doesn't prevent attacks entirely, but reduces the attack surface.
 
 ## Twitch Account Authorization
 
