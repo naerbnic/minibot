@@ -77,11 +77,10 @@ def MakeServer():
         (r'/account/complete', CompleteAccountCreateHandler, dict(creation_manager=creations)),
     ])
 
-def TestAccountCreateExchange():
+async def TestAccountCreateExchange():
     app = MakeServer()
     app.listen(8080)
     client = httpclient.AsyncHTTPClient()
-    loop = ioloop.IOLoop.current()
     async def inner():
         first_response = await client.fetch("http://localhost:8080/account/create", method = "POST", body = "")
         response_body = escape.json_decode(first_response.body)
@@ -91,15 +90,8 @@ def TestAccountCreateExchange():
         second_response = await client.fetch("http://localhost:8080/account/complete?state_token={}".format(state_token), method = "POST", body = "")
         response_body = escape.json_decode(second_response.body)
         print("Response body: {}".format(response_body))
-        loop.stop()
 
-    def run_client():
-        asyncio.create_task(inner())
-
-    loop.add_callback(run_client)
-    loop.start()
-
-
+    await asyncio.create_task(inner())
 
 def main():
-    TestAccountCreateExchange()
+    asyncio.run(TestAccountCreateExchange())
