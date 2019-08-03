@@ -98,10 +98,143 @@ The websocket API is accessible on the server at path `/channel/ws`. The client 
 
 On starting a websocket connection, the Server will start up connections and associations necessary on Twitch to provide the features of the websocket protocol. This includes access to chat, any PubSub endpoints necessary, and starting any Webhook subscriptions necessary. The lifetime of these are all connected to the lifetime of the websocket connection, and will be unregistered if the local client disconnects from the API.
 
+All messages on the WebSocket will be text JSON documents.
+
 ### RPC format
 
-Aside from the "hello" message (sent by the server when first connected) all messages from the server are initiated by the client. The client sends a JSON
-object with the general format:
+All RPCs are calls from the client to the server. Each call has a response from the server.
 
-FIXME: Complete this section
+Each message has a "type" field that identifies the type of message being sent, and the other expected fields are based on that type.
 
+#### Hello Message (Server -> Client)
+
+This is the first message sent to the client from the server. This message has info that may be useful for the client. This has type "hello". The other fields are:
+
+- **streamer_name**: The literal name of the streamer's account. This will be the name as seen in IRC, and as such will be all lowercase.
+- **bot_name**: The literal name of the bot's account.
+
+The client does not need to wait for the hello message before calling RPCs, although they will not be responded to until the hello message is sent.
+
+#### Call Message (Client -> Server)
+
+Call messages have the literal type "call". The other fields are as follows:
+
+- **id**: An integer that will be used to identify the response. IDs should be in the 32-bit unsigned integer range. IDs can be reused, but IDs should not be used while there are still pending RPCs to avoid confusion.
+- **method**: A string indicating which RPC method is being called.
+- **params**: A JSON value that is passed as a parameter. What value depends on the method being called.
+
+```json
+{
+    "type": "call",
+    "id": 1,
+    "method": "sendmsg",
+    "params": {
+        "text": "foobar!",
+    }
+}
+```
+
+#### Response Message (Server -> Client)
+
+Response messages have the literal type "resp". The other fields are as follows:
+
+- **id**: An integer that was taken from the call message this is a response to.
+- **result**: A JSON object indicating the result of the call. Note that this includes any method-specific errors (as opposed to protocol errors).
+
+#### Event Message (Server -> Client)
+
+Through RPCs, the client may establish it is interested in events from the server. The server sends event messages using messages with the "event" type. The other fields are as follows:
+
+- **id**: An ID established in the RPC to identify the event stream. This is a different ID namespace than those used for "call" or "resp" events.
+- **evts**: A JSON list of event objects. This allows the server to batch multiple events if needed.
+
+Event objects have the field "type" to indicate what type of event it is, and the other fields depend on that type.
+
+#### Error Message (Server -> Client)
+
+There may be errors that the client needs to know about. These are generally about the general state of the current websocket session, and not simply a response to an RPC. Error messages have a field "type" of value "error". Other fields are:
+
+- **error_type**: A string that unformly identifies the type of this error. This can be used by the client to identify actions necessary, if any.
+- **description**: A human-readable string that describes the error more thoroughly. These may be useful to add to a log on the client side.
+- **data**: Optional structured data about the error.
+
+### RPC Methods
+
+These are the different RPC methods the client can call on the server.
+
+#### `get_chat_users`
+
+Get the list of users who are currently in the chat room.
+
+**Params**: An empty object
+
+**Result**: An object with the following fields:
+
+- **users**: A string list, where each string is a username of people currently in the streamer's chat. This may be incomplete if there are sufficient users.
+- **num_users**: An integer of the number of users in chat.
+
+#### `get_subscribers`
+
+#### `get_followers`
+
+#### `chat_msg`
+
+#### `whisper_msg`
+
+#### `chat_clear`
+
+#### `ban`
+
+#### `unban`
+
+#### `marker`
+
+#### `clip`
+
+#### `listen`
+
+Start listening to one or more event messages.
+
+Params: Object with the following fields
+
+- **event_id**: A unsigned 32-bit integer value that will be used as an event stream ID. Should not be the same as any current event stream.
+- **event_types**: A list of strings with the types of events that the user wants to listen to.
+
+Response: Object with the following fields:
+
+- **success**: A boolean if the listening was valid.
+- **registered_types**: A list of strings with the events that will be sent to the user.
+
+Event messages will be sent with the given **event_id** for the listened to events.
+
+#### `unlisten`
+
+Stop listening to an event stream.
+
+### Event Messages
+
+#### `user_chat_join`
+
+#### `user_chat_leave`
+
+#### `user_follow`
+
+#### `user_unfollow`
+
+#### `user_subscribe`
+
+#### `gift_subscribe`
+
+#### `user_unsubscribe`
+
+#### `user_subscribe_notify`
+
+#### `user_chat_command`
+
+#### `bot_whisper`
+
+#### `user_host`
+
+#### `user_unhost`
+
+#### `user_cheer`
