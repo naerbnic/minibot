@@ -9,6 +9,7 @@ setup(name='minibot_server',
       ],
       entry_points={
           'console_scripts': [
-              'run_minibot_server=minibot_server:main'
+              'run_minibot_server=minibot_server:main',
+              'run_twitch_irc_test=minibot_server.irc:TestTwitchIrcMain',
           ]
       })
