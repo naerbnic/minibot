@@ -9,23 +9,23 @@ class BytesMuncher:
     def __init__(self, bytestr: bytes):
         self._bytestr = bytestr
 
-    def SplitToSpace(self) -> Optional[bytes]:
+    def SplitToSpace(self) -> bytes:
         m = re.match(rb'([^ ]+)($|[ ]+)', self._bytestr)
         if m:
             self._bytestr = self._bytestr[m.end():]
             return m.group(1)
         else:
-            return None
+            raise ValueError()
 
-    def HasFirstChar(self, firstchar: bytes):
+    def HasFirstChar(self, firstchar: bytes) -> bool:
         if not self._bytestr:
             return False
         return self._bytestr[0] == ord(firstchar)
 
-    def IsEmpty(self):
+    def IsEmpty(self) -> bool:
         return not self._bytestr
 
-    def Rest(self):
+    def Rest(self) -> bytes:
         return self._bytestr
 
 
@@ -113,12 +113,12 @@ class Message:
         self.tags = tags
         self.prefix = prefix
         self.command = command
-        self.args = args
+        self.args = list(args)
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"Message({self.command}, {self.args}, tags={self.tags}, prefix={self.prefix})"
 
-    def ToWireFormat(self):
+    def ToWireFormat(self) -> bytes:
         tag_pieces = [] # type: List[bytes]
         for (k, v) in self.tags.items():
             if v:
@@ -143,21 +143,21 @@ class Message:
 
         return b' '.join(line_pieces)
 
-_T = typing.TypeVar("T")
+_T = typing.TypeVar("_T")
 
 class CloseableQueue(typing.Generic[_T]):
-    _inner_queue: asyncio.Queue
+    _inner_queue: asyncio.Queue[_T]
     _close_event: asyncio.Event
     _empty_event: asyncio.Event
 
-    def __init__(self, maxsize=0):
+    def __init__(self, maxsize: int = 0):
         self._inner_queue = asyncio.Queue(maxsize)
         self._close_event = asyncio.Event()
         self._empty_event = asyncio.Event()
 
     async def Get(self) -> Optional[_T]:
         if not self._close_event.is_set():
-            async def closing():
+            async def closing() -> None:
                 await self._close_event.wait()
                 return None
             for f in asyncio.as_completed((self._inner_queue.get(), closing())):
@@ -184,12 +184,12 @@ class CloseableQueue(typing.Generic[_T]):
             raise RuntimeError()
         await self._inner_queue.put(val)
 
-    def Close(self):
+    def Close(self) -> None:
         self._close_event.set()
         if self._inner_queue.empty():
             self._empty_event.set()
 
-    async def WaitUntilEmpty(self):
+    async def WaitUntilEmpty(self) -> None:
         await self._empty_event.wait()
 
 
@@ -199,28 +199,28 @@ class IrcClientChannel:
     Can read messages from and write messages to the channel. Does no other
     protocol parsing.
     """
-    @staticmethod
-    async def Connect(host, port) -> "IrcClientChannel":
+    @classmethod
+    async def Connect(cls, host: str, port: int) -> "IrcClientChannel":
         reader, writer = await asyncio.open_connection(host, port, ssl=True)
 
-        client = IrcClientChannel(reader, writer)
+        client = cls(reader, writer)
         await client._Start()
         return client
 
-    _read_task: asyncio.Task
-    _write_task: asyncio.Task
+    _read_task: asyncio.Task[None]
+    _write_task: asyncio.Task[None]
     _read_queue: CloseableQueue[Message]
     _write_queue: CloseableQueue[Message]
     _reader: asyncio.StreamReader
     _writer: asyncio.StreamWriter
 
-    def __init__(self, reader, writer):
+    def __init__(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
         self._reader = reader
         self._writer = writer
         self._read_queue = CloseableQueue(10)
         self._write_queue = CloseableQueue(10)
 
-    async def _Start(self):
+    async def _Start(self) -> None:
         self._read_task = asyncio.create_task(self._process_reader())
         self._write_task = asyncio.create_task(self._process_writer())
 
@@ -242,7 +242,7 @@ class IrcClientChannel:
         """
         self._write_queue.Close()
 
-    async def _process_reader(self):
+    async def _process_reader(self) -> None:
         # Read a single IRC message and remove the trailing newline
         try:
             while True:
@@ -256,7 +256,7 @@ class IrcClientChannel:
         self._read_queue.Close()
         self._write_queue.Close()
 
-    async def _process_writer(self):
+    async def _process_writer(self) -> None:
         while True:
             message = await self._write_queue.Get() # type: Optional[Message]
             if message is None:
@@ -272,13 +272,13 @@ class IrcClientChannel:
             self._writer.close()
             await self._writer.wait_closed()
 
-    async def WaitForExit(self):
+    async def WaitForExit(self) -> None:
         await self._read_task
         await self._write_task
         await self._read_queue.WaitUntilEmpty()
 
 
-async def TestTwitchIrc():
+async def TestTwitchIrc() -> None:
     client = await IrcClientChannel.Connect("irc.chat.twitch.tv", 6697)
     await client.Write(Message(b'CAP', b'REQ', b'twitch.tv/membership twitch.tv/tags twitch.tv/commands'))
     await client.Write(Message(b'PASS', b'oauth:' + b''))
@@ -292,5 +292,5 @@ async def TestTwitchIrc():
         print(msg)
     await client.WaitForExit()
 
-def TestTwitchIrcMain():
+def TestTwitchIrcMain() -> None:
     asyncio.run(TestTwitchIrc())

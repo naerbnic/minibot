@@ -112,7 +112,7 @@ class OAuthCallbackManager:
 
         return (auth_url, Inner())
 
-    async def complete(self, state, code) -> None:
+    async def complete(self, state: str, code: str) -> None:
         async with self._lock:
             result = await self._provider.exchange_code(self._client, code)
             event = self._callbacks[state]
@@ -123,9 +123,6 @@ class OAuthCallbackManager:
 class AccountCreationManager:
     _lock: asyncio.Lock = asyncio.Lock()
     _pending_creates: Dict[str, Awaitable[Any]] = {}
-
-    def __init__(self):
-        pass
 
     async def add_creation(self, token: str, callback: Awaitable[Any]) -> None:
         async with self._lock:

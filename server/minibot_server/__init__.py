@@ -55,7 +55,7 @@ class HelloWorldHandler(web.RequestHandler):
         self.finish()
 
 
-def ReadConfig():
+def ReadConfig() -> OAuthClientInfo:
     homedir = os.getenv("HOME")
     if homedir is None:
         raise ValueError()
@@ -66,7 +66,7 @@ def ReadConfig():
         config_data['client_secret'],
         config_data['redirect_url'])
 
-def MakeServer():
+def MakeServer() -> web.Application:
     client_info = ReadConfig()
     provider = OAuthProvider(client_info, TWITCH_PROVIDER)
     callbacks = OAuthCallbackManager(provider)
@@ -77,11 +77,11 @@ def MakeServer():
         (r'/account/complete', CompleteAccountCreateHandler, dict(creation_manager=creations)),
     ])
 
-async def TestAccountCreateExchange():
+async def TestAccountCreateExchange() -> None:
     app = MakeServer()
     app.listen(8080)
     client = httpclient.AsyncHTTPClient()
-    async def inner():
+    async def inner() -> None:
         first_response = await client.fetch("http://localhost:8080/account/create", method = "POST", body = "")
         response_body = escape.json_decode(first_response.body)
         state_token = response_body['state_token']
@@ -93,5 +93,5 @@ async def TestAccountCreateExchange():
 
     await asyncio.create_task(inner())
 
-def main():
+def main() -> None:
     asyncio.run(TestAccountCreateExchange())
