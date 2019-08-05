@@ -3,6 +3,7 @@ import re
 from typing import Tuple, Optional, Union, Dict, List, Awaitable
 import typing
 
+
 class BytesMuncher:
     _bytestr: bytes
 
@@ -54,6 +55,7 @@ def UnescapeTagValue(tag_value: bytes) -> bytes:
                 result.append(next_byte)
     return bytes(result)
 
+
 def EscapeTagValue(tag_value: bytes) -> bytes:
     result = bytearray()
     for b in tag_value:
@@ -75,9 +77,9 @@ def EscapeTagValue(tag_value: bytes) -> bytes:
 class Message:
     @staticmethod
     def Parse(msg_data: bytes) -> "Message":
-        tags_part = None # type: Union[bytes, None]
-        prefix = None # type: Union[bytes, None]
-        args = [] # type: List[bytes]
+        tags_part = None  # type: Union[bytes, None]
+        prefix = None  # type: Union[bytes, None]
+        args = []  # type: List[bytes]
         muncher = BytesMuncher(msg_data)
         if muncher.HasFirstChar(b'@'):
             tags_part = muncher.SplitToSpace()[1:]
@@ -92,7 +94,7 @@ class Message:
         if not muncher.IsEmpty():
             args.append(muncher.Rest()[1:])
 
-        tags = {} # type: Dict[bytes, bytes]
+        tags = {}  # type: Dict[bytes, bytes]
         if tags_part is not None:
             for tag_entry in tags_part.split(b';'):
                 entry_parts = tag_entry.split(b'=', 1)
@@ -102,7 +104,7 @@ class Message:
                     (key, value) = entry_parts
                     tags[key] = UnescapeTagValue(value)
 
-        return Message(command, *args, tags = tags, prefix = prefix)
+        return Message(command, *args, tags=tags, prefix=prefix)
 
     tags: Dict[bytes, bytes]
     prefix: Optional[bytes]
@@ -119,14 +121,14 @@ class Message:
         return f"Message({self.command}, {self.args}, tags={self.tags}, prefix={self.prefix})"
 
     def ToWireFormat(self) -> bytes:
-        tag_pieces = [] # type: List[bytes]
+        tag_pieces = []  # type: List[bytes]
         for (k, v) in self.tags.items():
             if v:
                 tag_pieces.append(k + b'=' + EscapeTagValue(v))
             else:
                 tag_pieces.append(k)
 
-        line_pieces = [] # type: List[bytes]
+        line_pieces = []  # type: List[bytes]
         if tag_pieces:
             line_pieces.append(b'@' + b';'.join(tag_pieces))
 
@@ -143,7 +145,9 @@ class Message:
 
         return b' '.join(line_pieces)
 
+
 _T = typing.TypeVar("_T")
+
 
 class CloseableQueue(typing.Generic[_T]):
     _inner_queue: asyncio.Queue[_T]
@@ -167,7 +171,8 @@ class CloseableQueue(typing.Generic[_T]):
                     return value
                 else:
                     if not self._close_event.is_set():
-                        raise RuntimeError("Close event should be set on a none value")
+                        raise RuntimeError(
+                            "Close event should be set on a none value")
                     # We're closed
                     break
         if not self._inner_queue.empty():
@@ -258,7 +263,7 @@ class IrcClientChannel:
 
     async def _process_writer(self) -> None:
         while True:
-            message = await self._write_queue.Get() # type: Optional[Message]
+            message = await self._write_queue.Get()  # type: Optional[Message]
             if message is None:
                 break
             wire_message = message.ToWireFormat()
@@ -291,6 +296,7 @@ async def TestTwitchIrc() -> None:
             break
         print(msg)
     await client.WaitForExit()
+
 
 def TestTwitchIrcMain() -> None:
     asyncio.run(TestTwitchIrc())
