@@ -93,5 +93,18 @@ async def TestAccountCreateExchange() -> None:
 
     await asyncio.create_task(inner())
 
+class DumbHandler(web.RequestHandler):
+    def get(self):
+        self.finish(u'Hello, World!')
+
+async def RunDumbServer() -> None:
+    app = web.Application([
+        (r'/', DumbHandler)
+    ])
+    app.listen(8080)
+
 def main() -> None:
-    asyncio.run(TestAccountCreateExchange())
+    def loop_start(fut):
+        asyncio.create_task(fut)
+    asyncio.get_event_loop().call_soon(loop_start, RunDumbServer())
+    asyncio.get_event_loop().run_forever()

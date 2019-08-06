@@ -1,5 +1,5 @@
 {
-    "python.pythonPath": "venv-prod/bin/python",
+    "python.pythonPath": "venv/bin/python",
     "files.exclude": {
         "**/__pycache__": true,
         "**/*.egg-info": true
