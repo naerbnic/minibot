@@ -1,16 +1,53 @@
 apiVersion: v1
-kind: Pod
+kind: Service
 metadata:
-  name: minibot-server-pod
-  labels:
-    name: minibot-server-pod
+  name: minibot-server-service
 spec:
-  containers:
-  - name: minibot-server
-    image: minibot_server:latest
-    resources:
-      limits:
-        memory: "128Mi"
-        cpu: "500m"
-    ports:
-      - containerPort: 8080
+  selector:
+    app: minibot-server-app
+  ports:
+  - port: 80
+    targetPort: 8080
+  type: NodePort
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: minibot-server-replica
+  labels:
+    app: minibot-server-app
+    tier: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      tier: frontend
+  template:
+    metadata:
+      labels:
+        app: minibot-server-app
+        tier: frontend
+    spec:
+      containers:
+      - name: minibot-server
+        image: gcr.io/minibot/minibot_server:latest
+        resources:
+          limits:
+            memory: "128Mi"
+            cpu: "50m"
+        ports:
+          - containerPort: 8080
+---
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: test-ingress
+  annotations:
+    kubernetes.io/ingress.global-static-ip-name: minibot-ip-address
+    networking.gke.io/managed-certificates: minibot-cert
+    kubernetes.io/ingress.allow-http: "false"
+spec:
+  backend:
+    serviceName: minibot-server-service
+    servicePort: 80
+

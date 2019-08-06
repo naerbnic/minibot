@@ -16,4 +16,6 @@ WORKDIR /app
 
 RUN pip install .
 
+EXPOSE 8080
+
 CMD ["run_minibot_server"]
