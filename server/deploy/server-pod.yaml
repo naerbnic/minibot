@@ -11,7 +11,7 @@ spec:
   type: NodePort
 ---
 apiVersion: apps/v1
-kind: ReplicaSet
+kind: Deployment
 metadata:
   name: minibot-server-replica
   labels:
