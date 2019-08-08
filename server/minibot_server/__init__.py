@@ -6,6 +6,10 @@ import secrets
 import yaml
 import os
 
+from .config import ReadConfig
+
+from typing import Awaitable
+
 class OAuthRedirectHandler(web.RequestHandler):
     _callback_manager: OAuthCallbackManager
 
@@ -55,17 +59,6 @@ class HelloWorldHandler(web.RequestHandler):
         self.finish()
 
 
-def ReadConfig() -> OAuthClientInfo:
-    homedir = os.getenv("HOME")
-    if homedir is None:
-        raise ValueError()
-    yaml_path = os.path.join(homedir, ".config/minibot/config.yaml")
-    config_data = yaml.safe_load(open(yaml_path, mode = 'r').read())
-    return OAuthClientInfo(
-        config_data['client_id'],
-        config_data['client_secret'],
-        config_data['redirect_url'])
-
 def MakeServer() -> web.Application:
     client_info = ReadConfig()
     provider = OAuthProvider(client_info, TWITCH_PROVIDER)
@@ -94,17 +87,18 @@ async def TestAccountCreateExchange() -> None:
     await asyncio.create_task(inner())
 
 class DumbHandler(web.RequestHandler):
-    def get(self):
-        self.finish(u'Hello, World!')
+    def get(self) -> None:
+        self.finish(f'Hello, World!\nHeaders: {dict(self.request.headers)}')
 
 async def RunDumbServer() -> None:
+    config = ReadConfig()
     app = web.Application([
         (r'/', DumbHandler)
     ])
     app.listen(8080)
 
 def main() -> None:
-    def loop_start(fut):
+    def loop_start(fut: Awaitable[None]) -> None:
         asyncio.create_task(fut)
     asyncio.get_event_loop().call_soon(loop_start, RunDumbServer())
     asyncio.get_event_loop().run_forever()

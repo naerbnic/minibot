@@ -29,14 +29,26 @@ spec:
         tier: frontend
     spec:
       containers:
-      - name: minibot-server
-        image: gcr.io/minibot/minibot_server:latest
-        resources:
-          limits:
-            memory: "128Mi"
-            cpu: "50m"
-        ports:
-          - containerPort: 8080
+        - name: minibot-server
+          image: gcr.io/minibot/minibot_server:latest
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "50m"
+          ports:
+            - containerPort: 8080
+          volumeMounts:
+            - name: config-volume
+              mountPath: /etc/minibot/config
+            - name: secret-volume
+              mountPath: /etc/minibot/secret
+      volumes:
+        - name: config-volume
+          configMap:
+            name: minibot-config
+        - name: secret-volume
+          secret:
+            secretName: minibot-secret
 ---
 apiVersion: extensions/v1beta1
 kind: Ingress
