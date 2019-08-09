@@ -1,7 +1,7 @@
 from tornado import httpclient
 from tornado import web
 from urllib import parse
-from typing import List, Union, Any, Dict, Awaitable, Tuple
+from typing import List, Union, Any, Dict, Awaitable, Tuple, NamedTuple
 import asyncio
 import json
 import secrets
@@ -9,25 +9,15 @@ import secrets
 class Error(BaseException):
     pass
 
-class OAuthClientInfo:
+class OAuthClientInfo(NamedTuple):
     client_id: str
     client_secret: str
     redirect_url: str
 
-    def __init__(self, client_id: str, client_secret: str, redirect_url: str):
-        self.client_id = client_id
-        self.client_secret = client_secret
-        self.redirect_url = redirect_url
-
-class OAuthProviderInfo:
+class OAuthProviderInfo(NamedTuple):
     authz_endpoint: str
     token_endpoint: str
     jwks_url: str
-
-    def __init__(self, authz_endpoint: str, token_endpoint: str, jwks_url: str):
-        self.authz_endpoint = authz_endpoint
-        self.token_endpoint = token_endpoint
-        self.jwks_url = jwks_url
 
 class OAuthProvider:
     client: OAuthClientInfo
@@ -38,7 +28,7 @@ class OAuthProvider:
         self.provider = provider
 
     def auth_url(self, *, state_token: str, scopes: List[str], nonce: Union[str, None] = None) -> str:
-        params = {
+        params: Dict[str, str] = {
             'client_id': self.client.client_id,
             'redirect_uri': self.client.redirect_url,
             'response_type': 'code',
