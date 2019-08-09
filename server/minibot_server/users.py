@@ -63,7 +63,7 @@ class UserStore:
         self._users[user.user_id] = user
         self._by_twitch_id[user.twitch_user.twitch_id] = user.user_id
 
-        return user.user_id
+        return user
 
     def DeleteUser(self, user_id: UserId) -> None:
         try:

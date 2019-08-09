@@ -60,7 +60,12 @@ class HelloWorldHandler(web.RequestHandler):
 
 
 def MakeServer() -> web.Application:
-    client_info = ReadConfig()
+    config = ReadConfig()
+    client_info = OAuthClientInfo(
+        client_id = config.config_doc.twitch_client_id,
+        client_secret = config.secret_doc.twitch_client_secret,
+        redirect_url = config.config_doc.twitch_redirect_url,
+    )
     provider = OAuthProvider(client_info, TWITCH_PROVIDER)
     callbacks = OAuthCallbackManager(provider)
     creations = AccountCreationManager()

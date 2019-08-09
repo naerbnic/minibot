@@ -2,19 +2,17 @@ import os
 import yaml
 
 from typing import Dict, Any, Tuple
+from dataclasses import dataclass
 
 def ReadTextFile(*path_args: str) -> str:
     path = os.path.join(*path_args)
     with open(path, mode = "r") as f:
         return f.read()
 
+@dataclass
 class ConfigDoc:
     twitch_client_id: str
     twitch_redirect_url: str
-
-    def __init__(self, *, twitch_client_id: str, twitch_redirect_url: str):
-        self.twitch_client_id = twitch_client_id
-        self.twitch_redirect_url = twitch_redirect_url
 
 def ParseConfigDoc(doc: str) -> ConfigDoc:
     data = yaml.safe_load(doc)
@@ -23,11 +21,9 @@ def ParseConfigDoc(doc: str) -> ConfigDoc:
         twitch_redirect_url = data["twitch_redirect_url"],
     )
 
+@dataclass
 class SecretDoc:
     twitch_client_secret: str
-
-    def __init__(self, *, twitch_client_secret: str):
-        self.twitch_client_secret = twitch_client_secret
 
 def ParseSecretDoc(doc: str) -> SecretDoc:
     data = yaml.safe_load(doc)
@@ -35,13 +31,10 @@ def ParseSecretDoc(doc: str) -> SecretDoc:
         twitch_client_secret = data["twitch_client_secret"]
     )
 
+@dataclass
 class MinibotConfig:
     config_doc: ConfigDoc
     secret_doc: SecretDoc
-
-    def __init__(self, *, config_doc: ConfigDoc, secret_doc: SecretDoc):
-        self.config_doc = config_doc
-        self.secret_doc = secret_doc
 
 def ParseConfigFromHomeDir() -> MinibotConfig:
     """Read the minibot config from the user's home directory.

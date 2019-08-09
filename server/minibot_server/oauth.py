@@ -2,6 +2,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado import web
 from urllib import parse
 from typing import List, Union, Any, Dict, Awaitable, Tuple, NamedTuple, Optional, NewType
+from dataclasses import dataclass
 import asyncio
 import json
 import secrets
@@ -10,12 +11,14 @@ import time
 class Error(BaseException):
     pass
 
-class OAuthClientInfo(NamedTuple):
+@dataclass
+class OAuthClientInfo:
     client_id: str
     client_secret: str
     redirect_url: str
 
-class OAuthProviderInfo(NamedTuple):
+@dataclass
+class OAuthProviderInfo:
     authz_endpoint: str
     token_endpoint: str
     jwks_url: str
