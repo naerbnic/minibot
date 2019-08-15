@@ -5,7 +5,8 @@ setup(name='minibot_server',
       packages=['minibot_server'],
       install_requires=[
         "tornado>=6.0",
-        "PyYAML>=5.0"
+        "PyYAML>=5.0",
+        "attrs>=19.1",
       ],
       entry_points={
           'console_scripts': [
