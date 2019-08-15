@@ -7,6 +7,8 @@ setup(name='minibot_server',
         "tornado>=6.0",
         "PyYAML>=5.0",
         "attrs>=19.1",
+        "PyJWT>=1.7",
+        "serde>=0.6",
       ],
       entry_points={
           'console_scripts': [
