@@ -11,8 +11,8 @@ TokenId = NewType("TokenId", str)
 class Token:
     id: TokenId
     user: UserId
-    desc: str
     created_at: Timestamp
+    desc: Optional[str] = None
 
 
 class TokenStore:

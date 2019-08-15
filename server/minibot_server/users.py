@@ -2,6 +2,8 @@ from typing import Dict, List, NewType, Optional
 
 from .oauth import OAuthProvider, RefreshableToken, Timestamp, OAuthToken
 
+import attr
+
 class Error(BaseException):
     pass
 
@@ -24,17 +26,12 @@ class TwitchUser:
 
 UserId = NewType("UserId", int)
 
+@attr.s(auto_attribs=True)
 class User:
     user_id: UserId
     created_at: Timestamp
     twitch_user: TwitchUser
-    twitch_bot: Optional[TwitchUser]
-
-    def __init__(self, *, user_id: UserId, created_at: Timestamp, twitch_user: TwitchUser, twitch_bot: Optional[TwitchUser] = None):
-        self.user_id = user_id
-        self.created_at = created_at
-        self.twitch_user = twitch_user
-        self.twitch_bot = twitch_bot
+    twitch_bot: Optional[TwitchUser] = None
 
     def AddBot(self, twitch_bot: TwitchUser) -> None:
         self.twitch_bot = twitch_bot
