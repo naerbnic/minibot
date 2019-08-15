@@ -7,6 +7,7 @@ import asyncio
 import json
 import secrets
 import time
+from serde import Model, fields
 
 class Error(BaseException):
     pass
@@ -23,6 +24,10 @@ class OAuthProviderInfo:
     token_endpoint: str
     jwks_url: str
 
+class CodeExchangeResponse(Model):
+    access_token: str = fields.Str()
+    refresh_token: str = fields.Str()
+    expires_in: int = fields.Int()
 
 OAuthToken = NewType("OAuthToken", str)
 Timestamp = NewType("Timestamp", int)
