@@ -1,16 +1,53 @@
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado import web
 from urllib import parse
-from typing import List, Union, Any, Dict, Awaitable, Tuple, NamedTuple, Optional, NewType
+from typing import List, Union, Any, Dict, Awaitable, Tuple, NamedTuple, Optional, NewType, TypeVar, Type
 from dataclasses import dataclass
 import asyncio
 import json
 import secrets
+from __future__ import annotations
+
 import time
 from serde import Model, fields
 
 class Error(BaseException):
     pass
+
+class AuthToken:
+    _type: str
+    _token: str
+
+    @staticmethod
+    def Bearer(token: str) -> AuthToken:
+        return AuthToken("Bearer", token)
+
+    def __init__(self, type: str, token: str):
+        self._type = type
+        self._token = token
+
+    def HeaderValue(self) -> str:
+        return f"{self._type} {self._token}"
+
+MT = TypeVar("MT", bound=Model)
+MS = TypeVar("MS", bound=Model)
+
+class SimpleHttpClient:
+    _base_url: str
+    _http_client: AsyncHTTPClient
+
+    def __init__(self, base_url: str):
+        self._base_url = base_url
+        self._http_client = AsyncHTTPClient()
+
+    async def JsonRequest(self, *,
+            path: str,
+            method: str = "GET",
+            auth: Optional[AuthToken] = None,
+            body: Optional[MT] = None,
+            response: Optional[Type[MS]] = None) -> MS:
+        pass
+
 
 @dataclass
 class OAuthClientInfo:
@@ -28,6 +65,7 @@ class CodeExchangeResponse(Model):
     access_token: str = fields.Str()
     refresh_token: str = fields.Str()
     expires_in: int = fields.Int()
+    scopes: List[str] = fields.List(fields.Str())
 
 OAuthToken = NewType("OAuthToken", str)
 Timestamp = NewType("Timestamp", int)
