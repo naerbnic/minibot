@@ -1,15 +1,21 @@
+from __future__ import annotations
+
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest
 from tornado import web
 from urllib import parse
-from typing import List, Union, Any, Dict, Awaitable, Tuple, NamedTuple, Optional, NewType, TypeVar, Type
+from typing import (
+    List, Union, Any, Dict, Awaitable, Tuple, NamedTuple, Optional, NewType,
+    TypeVar, Type, Generic
+)
 from dataclasses import dataclass
 import asyncio
 import json
 import secrets
-from __future__ import annotations
 
 import time
 from serde import Model, fields
+from abc import ABC, abstractmethod, abstractclassmethod
+import attr
 
 class Error(BaseException):
     pass
@@ -29,10 +35,46 @@ class AuthToken:
     def HeaderValue(self) -> str:
         return f"{self._type} {self._token}"
 
+T = TypeVar("T")
 MT = TypeVar("MT", bound=Model)
 MS = TypeVar("MS", bound=Model)
 
-class SimpleHttpClient:
+@attr.s(auto_attribs=True)
+class RequestBody:
+    content_type: str
+    content: bytes
+
+def SerdeJsonRequest(data: MT) -> RequestBody:
+    content = data.to_json().encode()
+    return RequestBody(content_type='application/json', content=content)
+
+class ResponseParser(Generic[T]):
+    def ExpectedType(self) -> Optional[str]:
+        return None
+
+    @abstractmethod
+    def ParseResponseBody(self, content_type: Optional[str], body: bytes) -> T:
+        pass
+
+class SerdeJsonResponseParser(ResponseParser[MS]):
+    _body_type: Type[MS]
+
+    def __init__(self, body_type: Type[MS]):
+        self._body_type = body_type
+
+    def ExpectedType(self) -> Optional[str]:
+        return 'application/json'
+
+    def ParseResponseBody(self, content_type: Optional[str], body: bytes) -> MS:
+        if content_type is None or content_type != 'application/json':
+            raise ValueError()
+        return self._body_type.from_json(body.decode())
+
+
+class BaseSimpleHttpClient(ABC):
+    pass
+
+class SimpleHttpClient(BaseSimpleHttpClient):
     _base_url: str
     _http_client: AsyncHTTPClient
 
@@ -40,13 +82,41 @@ class SimpleHttpClient:
         self._base_url = base_url
         self._http_client = AsyncHTTPClient()
 
-    async def JsonRequest(self, *,
+    async def Request(self,
             path: str,
+            *,
             method: str = "GET",
             auth: Optional[AuthToken] = None,
-            body: Optional[MT] = None,
-            response: Optional[Type[MS]] = None) -> MS:
-        pass
+            query: Optional[Dict[str, str]] = None,
+            body: Optional[RequestBody] = None,
+            resp_parser: Optional[ResponseParser[T]] = None) -> Optional[T]:
+        full_url = parse.urljoin(self._base_url, path)
+        if query is not None:
+            full_url = f"{full_url}?{parse.urlencode(query)}"
+        headers = {}
+        if auth is not None:
+            headers['Authentication'] = auth.HeaderValue()
+        if body is not None:
+            headers['Content-Type'] = body.content_type
+        if resp_parser is not None:
+            expected_type = resp_parser.ExpectedType()
+            if expected_type is not None:
+                headers['Accept'] = expected_type
+
+        req_args: Dict[str, Any] = {}
+
+        if body is not None:
+            req_args['body'] = body.content
+
+        req = HTTPRequest(full_url, method=method, headers=headers, **req_args)
+        resp = await self._http_client.fetch(req, raise_error=True)
+
+        if resp_parser is not None:
+            # Reqire Content-Type headers
+            content_type = resp.headers.get('Content-Type', None)
+            return resp_parser.ParseResponseBody(content_type, resp.body)
+        else:
+            return None
 
 
 @dataclass
@@ -66,6 +136,11 @@ class CodeExchangeResponse(Model):
     refresh_token: str = fields.Str()
     expires_in: int = fields.Int()
     scopes: List[str] = fields.List(fields.Str())
+
+class TokenRefreshResponse(Model):
+    access_token: str = fields.Str()
+    refresh_token: str = fields.Str()
+    expires_in: int = fields.Int()
 
 OAuthToken = NewType("OAuthToken", str)
 Timestamp = NewType("Timestamp", int)
@@ -122,13 +197,12 @@ class RefreshableToken:
         return token
 
 class OAuthProvider:
-    http_client: AsyncHTTPClient
+    http_client: SimpleHttpClient
     client: OAuthClientInfo
     provider: OAuthProviderInfo
 
-    def __init__(self, client: OAuthClientInfo, provider: OAuthProviderInfo, http_client: Optional[AsyncHTTPClient] = None):
-        if http_client is None:
-            http_client = AsyncHTTPClient()
+    def __init__(self, client: OAuthClientInfo, provider: OAuthProviderInfo):
+        self.http_client = SimpleHttpClient(provider.token_endpoint)
         self.client = client
         self.provider = provider
 
@@ -149,55 +223,51 @@ class OAuthProvider:
         return "%s?%s" % (self.provider.authz_endpoint, query_str)
 
     async def exchange_code(self, current_time: Timestamp, code: str) -> RefreshableToken:
-        params = parse.urlencode({
+        params: Dict[str, str] = {
             'client_id': self.client.client_id,
             'client_secret': self.client.client_secret,
             'code': code,
             'grant_type': 'authorization_code',
             'redirect_uri': self.client.redirect_url,
-        })
+        }
 
-        exchange_url = "%s?%s" %(self.provider.token_endpoint, params)
-        request = HTTPRequest(url = exchange_url, method = 'POST', body = "")
-        response = await self.http_client.fetch(request)
-        if response.headers['Content-Type'] != 'application/json':
-            print(response.headers['Content-Type'])
-            raise Error()
+        contents = await self.http_client.Request('',
+            query = params,
+            resp_parser = SerdeJsonResponseParser(CodeExchangeResponse))
 
-        contents = json.loads(response.body.decode('utf-8'))
+        assert contents is not None
 
-        expires = None
-        if 'expires_in' in contents:
-            expires = contents['expires_in'] + current_time
+        expires: Optional[Timestamp] = None
+        if contents.expires_in is not None:
+            expires = Timestamp(contents.expires_in + current_time)
 
         access_token = AccessToken(
-            token = contents['access_token'],
+            token = OAuthToken(contents.access_token),
             expires = expires,
         )
 
         return RefreshableToken(
             access_token = access_token,
-            refresh_token = contents['refresh_token']
+            refresh_token = OAuthToken(contents.refresh_token)
         )
 
     async def GetTokenFromRefresh(self, refresh_token: str) -> RefreshResult:
-        params = parse.urlencode(dict(
+        params: Dict[str, str] = dict(
             client_id = self.client.client_id,
             client_secret = self.client.client_secret,
             grant_type = 'refresh_token',
             refresh_token = refresh_token,
-        ))
+        )
 
-        exchange_url = "%s?%s" % (self.provider.token_endpoint, params)
-        request = HTTPRequest(url = exchange_url, method = 'POST', body = "")
-        response = await self.http_client.fetch(request)
+        contents = await self.http_client.Request('',
+            method='POST', query=params, resp_parser=SerdeJsonResponseParser(TokenRefreshResponse))
 
-        contents = json.loads(response.body.decode('utf-8'))
+        assert contents is not None
 
         return RefreshResult(
-            access_token = contents['access_token'],
-            refresh_token = contents.get('refresh_token', None),
-            expires_in = contents.get('expires_in', None),
+            access_token = OAuthToken(contents.access_token),
+            refresh_token = OAuthToken(contents.refresh_token),
+            expires_in = contents.expires_in,
         )
 
 
