@@ -196,7 +196,20 @@ class RefreshableToken:
             assert token is not None
         return token
 
-class OAuthProvider:
+class OAuthProvider(ABC):
+    @abstractmethod
+    def AuthUrl(self, *, state_token: str, scopes: List[str], nonce: Optional[str] = None) -> str:
+        pass
+
+    @abstractmethod
+    def ExchangeCode(self, current_time: Timestamp, code: str) -> Awaitable[RefreshableToken]:
+        pass
+
+    @abstractmethod
+    async def GetTokenFromRefresh(self, refresh_token: str) -> RefreshResult:
+        pass
+
+class OAuthProviderImpl(OAuthProvider):
     http_client: SimpleHttpClient
     client: OAuthClientInfo
     provider: OAuthProviderInfo
@@ -206,7 +219,7 @@ class OAuthProvider:
         self.client = client
         self.provider = provider
 
-    def auth_url(self, *, state_token: str, scopes: List[str], nonce: Union[str, None] = None) -> str:
+    def AuthUrl(self, *, state_token: str, scopes: List[str], nonce: Union[str, None] = None) -> str:
         params: Dict[str, str] = {
             'client_id': self.client.client_id,
             'redirect_uri': self.client.redirect_url,
@@ -222,7 +235,7 @@ class OAuthProvider:
 
         return "%s?%s" % (self.provider.authz_endpoint, query_str)
 
-    async def exchange_code(self, current_time: Timestamp, code: str) -> RefreshableToken:
+    async def ExchangeCode(self, current_time: Timestamp, code: str) -> RefreshableToken:
         params: Dict[str, str] = {
             'client_id': self.client.client_id,
             'client_secret': self.client.client_secret,
@@ -291,7 +304,7 @@ class OAuthCallbackManager:
 
     async def start_auth(self) -> Tuple[str, Awaitable[Any]]:
         token = secrets.token_urlsafe(30)
-        auth_url = self._provider.auth_url(
+        auth_url = self._provider.AuthUrl(
             state_token = token,
             scopes = ['openid', 'user:edit'])
 
@@ -312,7 +325,7 @@ class OAuthCallbackManager:
 
     async def complete(self, state: str, code: str) -> None:
         async with self._lock:
-            result = await self._provider.exchange_code(Timestamp(int(time.time())), code)
+            result = await self._provider.ExchangeCode(Timestamp(int(time.time())), code)
             event = self._callbacks[state]
             self._result[state] = result
             event.set()
