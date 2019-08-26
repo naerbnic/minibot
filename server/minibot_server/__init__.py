@@ -6,7 +6,7 @@ import secrets
 import yaml
 import os
 
-from .config import ReadConfig
+from .config import (ReadConfig, MinibotConfig)
 
 from typing import Awaitable
 
@@ -58,15 +58,16 @@ class HelloWorldHandler(web.RequestHandler):
             self.write("Hello, World!")
         self.finish()
 
-
-def MakeServer() -> web.Application:
+def MakeRealOAuthProvider(config: MinibotConfig) -> OAuthProvider:
     config = ReadConfig()
     client_info = OAuthClientInfo(
         client_id = config.config_doc.twitch_client_id,
         client_secret = config.secret_doc.twitch_client_secret,
         redirect_url = config.config_doc.twitch_redirect_url,
     )
-    provider = OAuthProviderImpl(client_info, TWITCH_PROVIDER)
+    return OAuthProviderImpl(client_info, TWITCH_PROVIDER)
+
+def MakeServer(provider: OAuthProvider) -> web.Application:
     callbacks = OAuthCallbackManager(provider)
     creations = AccountCreationManager()
     return web.Application([
@@ -76,7 +77,9 @@ def MakeServer() -> web.Application:
     ])
 
 async def TestAccountCreateExchange() -> None:
-    app = MakeServer()
+    config = ReadConfig()
+    provider = MakeRealOAuthProvider(config)
+    app = MakeServer(provider)
     app.listen(8080)
     client = httpclient.AsyncHTTPClient()
     async def inner() -> None:
