@@ -159,7 +159,8 @@ class AccessToken:
             return None
         return self._token
 
-class RefreshResult(NamedTuple):
+@attr.s(auto_attribs=True)
+class RefreshResult:
     access_token: OAuthToken
     refresh_token: Optional[OAuthToken]
     expires_in: Optional[int]
@@ -206,7 +207,7 @@ class OAuthProvider(ABC):
         pass
 
     @abstractmethod
-    async def GetTokenFromRefresh(self, refresh_token: str) -> RefreshResult:
+    def GetTokenFromRefresh(self, refresh_token: str) -> Awaitable[RefreshResult]:
         pass
 
 class OAuthProviderImpl(OAuthProvider):
