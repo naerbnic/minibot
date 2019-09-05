@@ -3,8 +3,12 @@
 from tornado import web
 import asyncio
 import secrets
+import logging
+import time
 
 from . import oauth
+
+LOG = logging.Logger(__name__)
 
 class OAuthRedirectHandler(web.RequestHandler):
     _callback_manager: oauth.OAuthCallbackManager
@@ -41,9 +45,12 @@ class CompleteAccountCreateHandler(web.RequestHandler):
         self._creation_manager = creation_manager
 
     async def post(self) -> None:
-        token = self.get_argument('state_token')
-        result = await self._creation_manager.wait_result(token)
-        self.write(result)
+        state_token = self.get_argument('state_token')
+        result = await self._creation_manager.wait_result(state_token)
+        LOG.error(result)
+        token = result.TryGet(oauth.Timestamp(int(time.time())))
+        assert token is not None
+        self.write(token)
 
 class HelloWorldHandler(web.RequestHandler):
     def get(self) -> None:

@@ -17,16 +17,14 @@ class FakeOAuthProvider(OAuthProvider):
     _pending_auths: Dict[str, _AuthInfo]
     _pending_codes: Dict[str, _AuthInfo]
     _valid_refresh_tokens: Set[str]
-    _redirect_url: str
 
-    def __init__(self, redirect_url: str) -> None:
+    def __init__(self) -> None:
         self._client = AsyncHTTPClient()
         self._pending_auths = {}
         self._pending_codes = {}
         self._valid_refresh_tokens = set()
-        self._redirect_url = redirect_url
 
-    async def AcceptAuth(self, auth_url: str) -> None:
+    async def AcceptAuth(self, redirect_url: str, auth_url: str) -> None:
         parts = urllib.parse.urlsplit(auth_url)
         assert parts.scheme == 'http'
         assert parts.netloc == 'nonexistent.server'
@@ -42,7 +40,7 @@ class FakeOAuthProvider(OAuthProvider):
             'code': code,
             'state': auth_info.state
         }
-        callback_url = f"{self._redirect_url}?{urllib.parse.urlencode(callback_args)}"
+        callback_url = f"{redirect_url}?{urllib.parse.urlencode(callback_args)}"
         req = HTTPRequest(callback_url)
         await self._client.fetch(req)
 
@@ -55,6 +53,7 @@ class FakeOAuthProvider(OAuthProvider):
             'nonexistent.server',
             '/token/endpoint',
             f'token={token}',
+            '',
         ))
 
     async def ExchangeCode(self, current_time: Timestamp, code: str) -> RefreshableToken:

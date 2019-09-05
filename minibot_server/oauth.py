@@ -334,13 +334,13 @@ class OAuthCallbackManager:
 
 class AccountCreationManager:
     _lock: asyncio.Lock = asyncio.Lock()
-    _pending_creates: Dict[str, Awaitable[Any]] = {}
+    _pending_creates: Dict[str, Awaitable[RefreshableToken]] = {}
 
-    async def add_creation(self, token: str, callback: Awaitable[Any]) -> None:
+    async def add_creation(self, token: str, callback: Awaitable[RefreshableToken]) -> None:
         async with self._lock:
             self._pending_creates[token] = callback
 
-    async def wait_result(self, token: str) -> Any:
+    async def wait_result(self, token: str) -> RefreshableToken:
         async with self._lock:
             callback = self._pending_creates[token]
             del self._pending_creates[token]
